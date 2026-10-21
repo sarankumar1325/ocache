@@ -3,7 +3,7 @@
 import { cacheControlForbidsReuse } from "./cache-control.ts";
 import { hasUnkeyedVary, hasVaryWildcard } from "./vary.ts";
 
-import type { HandlerConfig } from "./config.ts";
+import { builtinCacheableStatuses, type HandlerConfig } from "./config.ts";
 import type { HTTPEvent, ResponseCacheEntry } from "../types.ts";
 
 // Storage validation and cache-control synthesis must share this predicate.
@@ -12,6 +12,12 @@ export function isCacheableStatus<E extends HTTPEvent>(
   status: number,
 ): boolean {
   return config.cacheableStatuses.has(status);
+}
+
+// A 304 stands in only for the built-in statuses: preconditions are ignored for a response
+// that would otherwise be an error (RFC 9110 §13.2.1), so a cached 404 is served as is.
+export function isConditionalStatus(status: number): boolean {
+  return builtinCacheableStatuses.has(status);
 }
 
 // Validate on write and read so access rejects unsafe legacy entries.

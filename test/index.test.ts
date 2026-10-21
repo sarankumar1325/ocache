@@ -8280,11 +8280,13 @@ describe("defineCachedHandler", () => {
         expect(r2.headers.get("x-cache")).toBe("HIT");
         expect(callCount).toBe(1);
 
-        // A stored representation now exists, so its validator can answer with 304.
+        // Preconditions do not apply to an error response (RFC 9110 §13.2.1): a matching
+        // validator still gets the stored error, never a 304.
         const r3 = (await handler(
           makeEvent(path, { headers: { "if-none-match": r1.headers.get("etag")! } }),
         )) as Response;
-        expect(r3.status).toBe(304);
+        expect(r3.status).toBe(status);
+        expect(await r3.text()).toBe("missing");
       });
     }
 
@@ -8351,7 +8353,7 @@ describe("defineCachedHandler", () => {
       expect(rejected).toBe(2);
     });
 
-    it("applies to headersOnly 304 decisions", async () => {
+    it("never turns a listed error status into a 304 in headersOnly mode", async () => {
       const handler = defineCachedHandler(
         () => new Response("missing", { status: 404, headers: { etag: '"v1"' } }),
         { maxAge: 60, headersOnly: true, cacheableStatusCodes: [404] },
@@ -8359,8 +8361,17 @@ describe("defineCachedHandler", () => {
       const res = (await handler(
         makeEvent(uniquePath(), { headers: { "if-none-match": '"v1"' } }),
       )) as Response;
-      expect(res.status).toBe(304);
+      expect(res.status).toBe(404);
+      expect(await res.text()).toBe("missing");
     });
+
+    for (const status of [0, 99, 199, 600, 404.5, Number.NaN]) {
+      it(`refuses ${status}, which no Response can carry`, () => {
+        expect(() =>
+          defineCachedHandler(() => new Response("ok"), { cacheableStatusCodes: [status] }),
+        ).toThrow(`\`cacheableStatusCodes\` cannot include ${status}.`);
+      });
+    }
 
     for (const status of [204, 205, 206, 304]) {
       it(`refuses ${status}, which has no complete representation`, () => {

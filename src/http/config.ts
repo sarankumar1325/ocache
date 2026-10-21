@@ -23,7 +23,9 @@ export const authHeaderNames: readonly string[] = /* @__PURE__ */ Object.freeze(
 ]);
 
 // Store only complete representations that are safe to reuse.
-const builtinCacheableStatuses: ReadonlySet<number> = /* @__PURE__ */ new Set([200, 203, 301, 308]);
+export const builtinCacheableStatuses: ReadonlySet<number> = /* @__PURE__ */ new Set([
+  200, 203, 301, 308,
+]);
 
 // No complete representation to replay, so `cacheableStatusCodes` cannot admit them.
 const unreplayableStatuses: ReadonlySet<number> = /* @__PURE__ */ new Set([204, 205, 206, 304]);
@@ -115,7 +117,13 @@ function resolveCacheableStatuses(extra: readonly number[] | undefined): Readonl
     return builtinCacheableStatuses;
   }
   for (const status of extra) {
-    if (unreplayableStatuses.has(status)) {
+    // `new Response()` only accepts integers from 200 to 599.
+    if (
+      !Number.isInteger(status) ||
+      status < 200 ||
+      status > 599 ||
+      unreplayableStatuses.has(status)
+    ) {
       throw unreplayableStatusError(status);
     }
   }
