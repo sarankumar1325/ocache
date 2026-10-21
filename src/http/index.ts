@@ -72,7 +72,7 @@ function defaultToResponse(value: unknown): Response {
  * Wraps an HTTP handler with response caching and conditional response support.
  *
  * Only GET and HEAD requests without Range are cacheable.
- * Only 200, 203, 301, and 308 responses are stored.
+ * Only 200, 203, 301, and 308 responses are stored, plus any listed in `cacheableStatusCodes`.
  * Response Cache-Control and Vary headers can prevent storage.
  *
  * @param handler - Handler to cache.
@@ -172,7 +172,7 @@ export function defineCachedHandler<E extends HTTPEvent = HTTPEvent>(
       // there are: run it first, then answer a matching conditional request with 304.
       const live = await toResponse(await handler(event), event);
       // A 304 needs a cacheable method and a representation to be current.
-      if (isBypassedMethod(event) || !isCacheableStatus(live.status)) {
+      if (isBypassedMethod(event) || !isCacheableStatus(config, live.status)) {
         return live;
       }
       const lastModified = live.headers.get("last-modified");
@@ -271,7 +271,7 @@ export function defineCachedHandler<E extends HTTPEvent = HTTPEvent>(
     // A MISS hands back the serialized entry even when `validate` refused to store it, and
     // a status outside the allowlist has no representation a 304 could stand in for.
     if (
-      isCacheableStatus(response.status) &&
+      isCacheableStatus(config, response.status) &&
       handleCacheHeaders(event, {
         ...requestConditions,
         modifiedTime: modifiedTime ? new Date(modifiedTime) : undefined,
